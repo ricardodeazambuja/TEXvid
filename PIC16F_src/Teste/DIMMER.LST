@@ -1,0 +1,621 @@
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00002 ;*                    CONTADOR MELHORADO - EX4                     *
+                      00003 ;*                       DESBRAVANDO O PIC                         *
+                      00004 ;*       DESENVOLVIDO PELA MOSAICO ENGENHARIA E CONSULTORIA        *
+                      00005 ;*      VERSÃO: 1.0                             DATA: 11/06/99     *
+                      00006 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00007 ;*                      DESCRIÇÃO DO ARQUIVO                       *
+                      00008 ;*-----------------------------------------------------------------*
+                      00009 ;*  CONTADOR QUE UTILIZA DOIS BOTÕES PARA INCREMENTAR E DECRE-     *
+                      00010 ;*  MENTAR O VALOR CONTROLADO PELA VARIÁVEL "CONTADOR". ESTA       *
+                      00011 ;*  VARIÁVEL ESTÁ LIMITADA PELAS CONSTANTES "MIN" E "MAX".         *
+                      00012 ;*  O VALOR DO CONTADOR É MOSTRADO NO DISPLAY.                     *
+                      00013 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00014 
+                      00015 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00016 ;*                     ARQUIVOS DE DEFINIÇÕES                      *
+                      00017 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00018 
+                      00019 #INCLUDE <P16F628.INC>          ;ARQUIVO PADRÃO MICROCHIP PARA 16F628A
+                      00001         LIST
+                      00002 ; P16F628.INC  Standard Header File, Version 1.01    Microchip Technology, Inc.
+                      00261         LIST
+2007   3FE1           00020         __CONFIG  _BODEN_ON & _CP_OFF & _PWRTE_ON & _WDT_OFF & _LVP_ON & _MCLRE_ON & _XT_OSC
+                      00021 
+                      00022         
+                      00023 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00024 ;*                    PAGINAÇÃO DE MEMÓRIA                         *
+                      00025 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00026 ;DEFINIÇÃO DE COMANDOS DE USUÁRIO PARA ALTERAÇÃO DA PÁGINA DE MEMÓRIA
+                      00027 
+                      00028 #DEFINE BANK0   BCF STATUS,RP0  ;SETA BANK 0 DE MEMÓRIA
+                      00029 #DEFINE BANK1   BSF STATUS,RP0  ;SETA BANK 1 DE MAMÓRIA
+                      00030 
+                      00031 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00032 ;*                         VARIÁVEIS                               *
+                      00033 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00034 ; DEFINIÇÃO DOS NOMES E ENDEREÇOS DE TODAS AS VARIÁVEIS UTILIZADAS 
+                      00035 ; PELO SISTEMA
+                      00036 
+                      00037         CBLOCK  0x20            ;ENDEREÇO INICIAL DA MEMÓRIA DE
+                      00038                                 ;USUÁRIO
+                      00039 
+  00000020            00040                 W_TEMP          ;REGISTRADORES TEMPORÁRIOS PARA
+  00000021            00041                 STATUS_TEMP     ;INTERRUPÇÕES
+                      00042                                 ;ESTAS VARIÁVEIS NEM SERÃO UTI-
+                      00043                                 ;LIZADAS
+  00000022            00044                 INTENSIDADE     ;ARMAZENA O VALOR DA CONTAGEM
+  00000023            00045                 FLAGS           ;ARMAZENA OS FLAGS DE CONTROLE
+  00000024            00046                 FILTRO11        ;FILTRAGEM  1 PARA O BOTÃO 1
+  00000025            00047                 FILTRO12        ;FILTRAGEM  2 PARA O BOTÃO 1
+  00000026            00048                 FILTRO21        ;FILTRAGEM  1 PARA O BOTÃO 2
+  00000027            00049                 FILTRO22        ;FILTRAGEM  2 PARA O BOTÃO 2
+  00000028            00050                 TEMPO           ;INTERVALOS DE 1 MS
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00051 
+                      00052         ENDC                    ;FIM DO BLOCO DE MEMÓRIA                
+                      00053 
+                      00054 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00055 ;*                        FLAGS INTERNOS                           *
+                      00056 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00057 ; DEFINIÇÃO DE TODOS OS FLAGS UTILIZADOS PELO SISTEMA
+                      00058 
+                      00059 #DEFINE ST_BT1  FLAGS,0         ;STATUS DO BOTÃO 1
+                      00060 #DEFINE ST_BT2  FLAGS,1         ;STATUS DO BOTÃO 2
+                      00061 
+                      00062 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00063 ;*                         CONSTANTES                              *
+                      00064 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00065 ; DEFINIÇÃO DE TODAS AS CONSTANTES UTILIZADAS PELO SISTEMA
+                      00066 
+  00000000            00067 MIN             EQU     .0      ;VALOR MÍNIMO PARA O INTENSIDADE
+  0000000F            00068 MAX             EQU     .15     ;VALOR MÁXIMO PARA O INTENSIDADE
+  00000014            00069 T_FILTRO        EQU     .20     ;FILTRO PARA BOTÃO
+                      00070         
+                      00071 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00072 ;*                           ENTRADAS                              *
+                      00073 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00074 ; DEFINIÇÃO DE TODOS OS PINOS QUE SERÃO UTILIZADOS COMO ENTRADA
+                      00075 ; RECOMENDAMOS TAMBÉM COMENTAR O SIGNIFICADO DE SEUS ESTADOS (0 E 1)
+                      00076 
+                      00077 #DEFINE BOTAO1  PORTA,1 ;PORTA DO BOTÃO
+                      00078                         ; 0 -> PRESSIONADO
+                      00079                         ; 1 -> LIBERADO
+                      00080 
+                      00081 #DEFINE BOTAO2  PORTA,2 ;PORTA DO BOTÃO
+                      00082                         ; 0 -> PRESSIONADO
+                      00083                         ; 1 -> LIBERADO
+                      00084 
+                      00085 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00086 ;*                           SAÍDAS                                *
+                      00087 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00088 ; DEFINIÇÃO DE TODOS OS PINOS QUE SERÃO UTILIZADOS COMO SAÍDA
+                      00089 ; RECOMENDAMOS TAMBÉM COMENTAR O SIGNIFICADO DE SEUS ESTADOS (0 E 1)
+                      00090 
+                      00091 #DEFINE LAMPADA PORTA,0 ;DEFINE LAMPADA NO PINO17
+                      00092                         ;0 LAMP. APAGADA
+                      00093                         ;1 LAMP. ACESA
+                      00094 
+                      00095 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00096 ;*                       VETOR DE RESET                            *
+                      00097 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00098 
+0000                  00099         ORG     0x00    ;ENDEREÇO INICIAL DE PROCESSAMENTO
+0000   2835           00100         GOTO    INICIO
+                      00101         
+                      00102 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00103 ;*                    INÍCIO DA INTERRUPÇÃO                        *
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00104 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00105 ; AS INTERRUPÇÕES NÃO SERÃO UTILIZADAS, POR ISSO PODEMOS SUBSTITUIR
+                      00106 ; TODO O SISTEMA EXISTENTE NO ARQUIVO MODELO PELO APRESENTADO ABAIXO
+                      00107 ; ESTE SISTEMA NÃO É OBRIGATÓRIO, MAS PODE EVITAR PROBLEMAS FUTUROS
+                      00108 
+0004                  00109         ORG     0x04            ;ENDEREÇO INICIAL DA INTERRUPÇÃO
+0004   00A0           00110         MOVWF   W_TEMP          ;SALVA W EM W_TEMP
+0005   0E03           00111         SWAPF   STATUS,W        
+0006   00A1           00112         MOVWF   STATUS_TEMP     ;SALVA STATUS EM STATUS_TEMP
+                      00113 
+0007   1D0B           00114         BTFSS   INTCON,T0IF     ;É INTERRUPÇÃO DE TMR0?
+0008   281D           00115         GOTO    SAI_INT         ;NÃO, SAI SE AÇÃO       
+                      00116                                 ;SIM
+                      00117 
+                      00118 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00119 ;*              TRATAMENTO DA INTERRUPÇÃO DE TMR0                  *
+                      00120 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00121 ; ESTA ROTINA IRÁ CONTAR O TEMPO, E QUANDO PASSAR 1 SEGUNDO, A VARI-
+                      00122 ; ÁVEL "TEMPO" SERÁ DECREMENTADA.
+                      00123 ; 1 SEGUNDO = 64us (PRESCALER) X 125 (TMR0) X 125 (TEMP1)
+                      00124 
+0009   110B           00125         BCF     INTCON,T0IF     ;LIMPA FLAG DA INT.
+                      00126 
+000A   3006           00127         MOVLW   .256-.250       ;SETA TIMER P250MS
+000B   0081           00128         MOVWF   TMR0            ;REINICIA TMR0
+                      00129 
+000C   0AA8           00130         INCF    TEMPO,F         ;INCREMENTA TEMPO
+                      00131         
+000D   3010           00132         MOVLW   .16             ;COLOCA 16 EM WORK
+000E   0628           00133         XORWF   TEMPO,W         ;COMPARA TEMPO COM 16
+000F   1903           00134         BTFSC   STATUS,Z        ;TESTA BIT Z DO REG. STATUS
+0010   01A8           00135         CLRF    TEMPO           ;ZERA TEMPO
+                      00136 
+0011   300F           00137         MOVLW   .15             ;COLOCA 15 EM W
+0012   0622           00138         XORWF   INTENSIDADE,W   ;COMPARA INTENSIDADE COM 15
+0013   1903           00139         BTFSC   STATUS,Z        ;TESTA BIT Z DO REG. STATUS
+0014   281B           00140         GOTO    LIGA_LAMPADA
+                      00141 
+0015   0822           00142         MOVF    INTENSIDADE,W   ;MOVE INTENSIDADE PARA W
+0016   0228           00143         SUBWF   TEMPO,W         ;SUBTRAI TEMPO DE INTENSIDADE
+0017   1C03           00144         BTFSS   STATUS,C        ;TESTA BIC C DO REG. STATUS
+                      00145                                 ;VERIFICA SE TEMPO E MENOR QUE INTENSIDADE
+0018   281B           00146         GOTO    LIGA_LAMPADA    
+                      00147 
+0019   1005           00148         BCF     LAMPADA         ;DESLIGA LAMPADA
+001A   281D           00149         GOTO    SAI_INT
+                      00150 
+001B                  00151 LIGA_LAMPADA
+                      00152         
+001B   1405           00153         BSF     LAMPADA         ;LIGA LAMPADA
+                      00154 
+001C   281D           00155         GOTO    SAI_INT         ;SAI DA INTERRUPÇÃO
+                      00156 
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00157 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00158 ;*                       FIM DA INTERRUPÇÃO                        *
+                      00159 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+001D                  00160 SAI_INT
+001D   0E21           00161         SWAPF   STATUS_TEMP,W
+001E   0083           00162         MOVWF   STATUS          ;RECUPERA STATUS
+001F   0EA0           00163         SWAPF   W_TEMP,F
+0020   0E20           00164         SWAPF   W_TEMP,W        ;RECUPERA W
+0021   0009           00165         RETFIE                  ;RETORNA DA INTERRUPÇÃO
+                      00166 
+                      00167 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00168 ;*                 ROTINA DE CONVERSÃO BINÁRIO -> DISPLAY          *
+                      00169 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00170 ; ESTA ROTINA IRÁ RETORNAR EM W, O SIMBOLO CORRETO QUE DEVE SER
+                      00171 ; MOSTRADO NO DISPLAY PARA CADA VALOR DE INTENSIDADE. O RETORNO JÁ ESTÁ
+                      00172 ; FORMATADO PARA AS CONDIÇÕES DE LIGAÇÃO DO DISPLAY AO PORTB.
+                      00173 ;          a
+                      00174 ;     **********
+                      00175 ;     *        *
+                      00176 ;   f *        * b
+                      00177 ;     *    g   *
+                      00178 ;     **********
+                      00179 ;     *        *
+                      00180 ;   e *        * c
+                      00181 ;     *    d   *
+                      00182 ;     **********  *.
+                      00183 
+0022                  00184 CONVERTE
+0022   0822           00185         MOVF    INTENSIDADE,W   ;COLOCA INTENSIDADE EM W
+0023   390F           00186         ANDLW   B'00001111'     ;MASCARA VALOR DE INTENSIDADE
+                      00187                                 ;CONSIDERAR SOMENTE ATÉ 15
+0024   0782           00188         ADDWF   PCL,F
+                      00189 
+                      00190 ;               B'EDC.BAFG'     ; POSIÇÃO CORRETA DOS SEGUIMENTOS
+0025   34EE           00191         RETLW   B'11101110'     ; 00 - RETORNA SÍMBOLO CORRETO 0
+0026   3428           00192         RETLW   B'00101000'     ; 01 - RETORNA SÍMBOLO CORRETO 1
+0027   34CD           00193         RETLW   B'11001101'     ; 02 - RETORNA SÍMBOLO CORRETO 2
+0028   346D           00194         RETLW   B'01101101'     ; 03 - RETORNA SÍMBOLO CORRETO 3
+0029   342B           00195         RETLW   B'00101011'     ; 04 - RETORNA SÍMBOLO CORRETO 4        
+002A   3467           00196         RETLW   B'01100111'     ; 05 - RETORNA SÍMBOLO CORRETO 5        
+002B   34E7           00197         RETLW   B'11100111'     ; 06 - RETORNA SÍMBOLO CORRETO 6        
+002C   342C           00198         RETLW   B'00101100'     ; 07 - RETORNA SÍMBOLO CORRETO 7        
+002D   34EF           00199         RETLW   B'11101111'     ; 08 - RETORNA SÍMBOLO CORRETO 8        
+002E   346F           00200         RETLW   B'01101111'     ; 09 - RETORNA SÍMBOLO CORRETO 9        
+002F   34AF           00201         RETLW   B'10101111'     ; 10 - RETORNA SÍMBOLO CORRETO A        
+0030   34E3           00202         RETLW   B'11100011'     ; 11 - RETORNA SÍMBOLO CORRETO b        
+0031   34C6           00203         RETLW   B'11000110'     ; 12 - RETORNA SÍMBOLO CORRETO C        
+0032   34E9           00204         RETLW   B'11101001'     ; 13 - RETORNA SÍMBOLO CORRETO d        
+0033   34C7           00205         RETLW   B'11000111'     ; 14 - RETORNA SÍMBOLO CORRETO E        
+0034   3487           00206         RETLW   B'10000111'     ; 15 - RETORNA SÍMBOLO CORRETO F        
+                      00207 
+                      00208 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00209 ;*                     INICIO DO PROGRAMA                          *
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00210 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00211         
+0035                  00212 INICIO
+0035   1283           00213         BANK0                   ;ALTERA PARA O BANCO 0
+0036   3007           00214         MOVLW   B'00000111'
+0037   009F           00215         MOVWF   CMCON           ;DEFINE O MODO DE OPERAÇÃO DO COMPARADOR ANALÓGICO
+                      00216 
+0038   1683           00217         BANK1                   ;ALTERA PARA O BANCO 1
+0039   3006           00218         MOVLW   B'00000110'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+003A   0085           00219         MOVWF   TRISA           ;DEFINE RA1 E 2 COMO ENTRADA E DEMAIS
+                      00220                                 ;COMO SAÍDAS
+003B   3000           00221         MOVLW   B'00000000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+003C   0086           00222         MOVWF   TRISB           ;DEFINE TODO O PORTB COMO SAÍDA
+003D   3081           00223         MOVLW   B'10000001'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+003E   0081           00224         MOVWF   OPTION_REG      ;PRESCALER 1:4 NO TMR0
+                      00225                                 ;PULL-UPS DESABILITADOS
+                      00226                                 ;AS DEMAIS CONFG. SÃO IRRELEVANTES
+003F   30A0           00227         MOVLW   B'10100000'
+0040   008B           00228         MOVWF   INTCON          ;CHAVE GERAL E TMR0 ATIVADAS
+0041   1283           00229         BANK0                   ;RETORNA PARA O BANCO 0
+                      00230 
+                      00231 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00232 ;*                     INICIALIZAÇÃO DAS VARIÁVEIS                 *
+                      00233 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00234 
+0042   0185           00235         CLRF    PORTA           ;LIMPA O PORTA
+0043   0186           00236         CLRF    PORTB           ;LIMPA O PORTB
+0044   01A3           00237         CLRF    FLAGS           ;LIMPA TODOS OS FLAGS
+0045   3000           00238         MOVLW   MIN
+0046   00A2           00239         MOVWF   INTENSIDADE     ;INICIA INTENSIDADE = MIN
+0047   3006           00240         MOVLW   .256-.250       ;SETA TIMER P250MS
+0048   0081           00241         MOVWF   TMR0            ;REINICIA TMR0
+0049   2872           00242         GOTO    ATUALIZA        ;ATUALIZA O DISPLAY INICIALMENTE
+                      00243 
+                      00244 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00245 ;*                     ROTINA PRINCIPAL                            *
+                      00246 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+004A                  00247 MAIN
+004A   01A4           00248         CLRF    FILTRO11
+004B   01A6           00249         CLRF    FILTRO21
+004C   3014           00250         MOVLW   T_FILTRO
+004D   00A5           00251         MOVWF   FILTRO12        ;INICIALIZA FILTRO1 = T_FILTRO
+004E   00A7           00252         MOVWF   FILTRO22        ;INICIALIZA FILTRO2 = T_FILTRO
+                      00253 
+                      00254 ;       movlw   0xFF
+                      00255 ;       movwf   PORTA
+                      00256 ;       goto MAIN
+                      00257 
+004F                  00258 CHECA_BT1
+                      00259 
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+004F   1885           00260         BTFSC   BOTAO1          ;O BOTÃO 1 ESTÁ PRESSIONADO?
+0050   2858           00261         GOTO    BT1_LIB         ;NÃO, ENTÃO TRATA COMO LIBERADO
+                      00262                                 ;SIM
+                      00263 
+0051   0BA4           00264         DECFSZ  FILTRO11,F      ;DECREMENTA O FILTRO DO BOTÃO
+                      00265                                 ;TERMINOU?
+0052   284F           00266         GOTO    CHECA_BT1       ;NÃO, CONTINUA ESPERANDO
+                      00267                                 ;SIM
+                      00268 
+0053   0BA5           00269         DECFSZ  FILTRO12,F      ;DECREMENTA O FILTRO DO BOTÃO
+                      00270                                 ;TERMINOU?
+0054   284F           00271         GOTO    CHECA_BT1       ;NÃO, CONTINUA ESPERANDO
+                      00272                                 ;SIM
+                      00273 
+0055   1C23           00274         BTFSS   ST_BT1          ;BOTÃO JÁ ESTAVA PRESSIONADO?
+0056   2864           00275         GOTO    DEC             ;NÃO, EXECUTA AÇÃO DO BOTÃO
+0057   2859           00276         GOTO    CHECA_BT2       ;SIM, CHECA BOTÃO 2
+                      00277 
+0058                  00278 BT1_LIB
+0058   1023           00279         BCF     ST_BT1          ;MARCA BOTÃO 1 COMO LIBERADO
+                      00280 
+0059                  00281 CHECA_BT2
+                      00282 
+0059   1905           00283         BTFSC   BOTAO2          ;O BOTÃO 2 ESTÁ PRESSIONADO?
+005A   2862           00284         GOTO    BT2_LIB         ;NÃO, ENTÃO TRATA COMO LIBERADO
+                      00285                                 ;SIM
+                      00286 
+005B   0BA6           00287         DECFSZ  FILTRO21,F      ;DECREMENTA O FILTRO DO BOTÃO
+                      00288                                 ;TERMINOU?
+005C   2859           00289         GOTO    CHECA_BT2       ;NÃO, CONTINUA ESPERANDO
+                      00290                                 ;SIM
+                      00291 
+005D   0BA7           00292         DECFSZ  FILTRO22,F      ;DECREMENTA O FILTRO DO BOTÃO
+                      00293                                 ;TERMINOU?
+005E   2859           00294         GOTO    CHECA_BT2       ;NÃO, CONTINUA ESPERANDO
+                      00295                                 ;SIM
+                      00296 
+005F   1CA3           00297         BTFSS   ST_BT2          ;BOTÃO JÁ ESTAVA PRESSIONADO?
+0060   286B           00298         GOTO    INC             ;NÃO, EXECUTA AÇÃO DO BOTÃO
+0061   284A           00299         GOTO    MAIN            ;SIM, VOLTA AO LOOPING
+                      00300 
+0062                  00301 BT2_LIB
+0062   10A3           00302         BCF     ST_BT2          ;MARCA BOTÃO 2 COMO LIBERADO
+0063   284A           00303         GOTO    MAIN            ;RETORNA AO LOOPING
+                      00304 
+0064                  00305 DEC                             ;AÇÃO DE DECREMENTAR
+0064   1423           00306         BSF     ST_BT1          ;MARCA BOTÃO 1 COMO JÁ PRESSIONADO
+0065   0822           00307         MOVF    INTENSIDADE,W   ;COLOCA INTENSIDADE EM W
+0066   3A00           00308         XORLW   MIN             ;APLICA XOR ENTRE INTENSIDADE E MIN
+                      00309                                 ;PARA TESTAR IGUALDADE. SE FOREM
+                      00310                                 ;IGUAIS, O RESULTADO SERÁ ZERO
+0067   1903           00311         BTFSC   STATUS,Z        ;RESULTOU EM ZERO?
+0068   284A           00312         GOTO    MAIN            ;SIM, RETORNA SEM AFETAR CONT.
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00313                                 ;NÃO
+0069   03A2           00314         DECF    INTENSIDADE,F   ;DECREMENTA O INTENSIDADE
+006A   2872           00315         GOTO    ATUALIZA        ;ATUALIZA O DISPLAY
+                      00316 
+006B                  00317 INC                             ;AÇÃO DE INCREMENTAR
+006B   14A3           00318         BSF     ST_BT2          ;MARCA BOTÃO 2 COMO JÁ PRESSIONADO
+006C   0822           00319         MOVF    INTENSIDADE,W   ;COLOCA INTENSIDADE EM W
+006D   3A0F           00320         XORLW   MAX             ;APLICA XOR ENTRE INTENSIDADE E MAX
+                      00321                                 ;PARA TESTAR IGUALDADE. SE FOREM
+                      00322                                 ;IGUAIS, O RESULTADO SERÁ ZERO
+006E   1903           00323         BTFSC   STATUS,Z        ;RESULTOU EM ZERO?
+006F   284A           00324         GOTO    MAIN            ;SIM, RETORNA SEM AFETAR CONT.
+                      00325                                 ;NÃO
+0070   0AA2           00326         INCF    INTENSIDADE,F   ;INCREMENTA O INTENSIDADE
+0071   2872           00327         GOTO    ATUALIZA        ;ATUALIZA O DISPLAY
+                      00328 
+0072                  00329 ATUALIZA
+0072   2022           00330         CALL    CONVERTE        ;CONVERTE INTENSIDADE NO NÚMERO DO
+                      00331                                 ;DISPLAY
+0073   0086           00332         MOVWF   PORTB           ;ATUALIZA O PORTB PARA
+                      00333                                 ;VISUALIZARMOS O VALOR DE INTENSIDADE
+                      00334                                 ;NO DISPLAY
+0074   284A           00335         GOTO    MAIN            ;NÃO, VOLTA AO LOOP PRINCIPAL
+                      00336 
+                      00337 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00338 ;*                       FIM DO PROGRAMA                           *
+                      00339 ;* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+                      00340 
+                      00341         END                     ;OBRIGATÓRIO
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  8
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADEN                              00000003
+ATUALIZA                          00000072
+BANK0                             BCF STATUS,RP0
+BANK1                             BSF STATUS,RP0
+BOTAO1                            PORTA,1
+BOTAO2                            PORTA,2
+BRGH                              00000002
+BT1_LIB                           00000058
+BT2_LIB                           00000062
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CHECA_BT1                         0000004F
+CHECA_BT2                         00000059
+CIS                               00000003
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000001F
+CMIE                              00000006
+CMIF                              00000006
+CONVERTE                          00000022
+CREN                              00000004
+CSRC                              00000007
+DC                                00000001
+DEC                               00000064
+EEADR                             0000009B
+EECON1                            0000009C
+EECON2                            0000009D
+EEDATA                            0000009A
+EEIE                              00000007
+EEIF                              00000007
+F                                 00000001
+FERR                              00000002
+FILTRO11                          00000024
+FILTRO12                          00000025
+FILTRO21                          00000026
+FILTRO22                          00000027
+FLAGS                             00000023
+FSR                               00000004
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE  9
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+GIE                               00000007
+INC                               0000006B
+INDF                              00000000
+INICIO                            00000035
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTENSIDADE                       00000022
+INTF                              00000001
+IRP                               00000007
+LAMPADA                           PORTA,0
+LIGA_LAMPADA                      0000001B
+MAIN                              0000004A
+MAX                               0000000F
+MIN                               00000000
+NOT_BO                            00000000
+NOT_BOD                           00000000
+NOT_BOR                           00000000
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+OERR                              00000001
+OPTION_REG                        00000081
+OSCF                              00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIR1                              0000000C
+PORTA                             00000005
+PORTB                             00000006
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+RBIE                              00000003
+RBIF                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+RX9                               00000006
+RX9D                              00000000
+SAI_INT                           0000001D
+SPBRG                             00000099
+SPEN                              00000007
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE 10
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+SREN                              00000005
+STATUS                            00000003
+STATUS_TEMP                       00000021
+ST_BT1                            FLAGS,0
+ST_BT2                            FLAGS,1
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1OSCEN                           00000003
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TEMPO                             00000028
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRMT                              00000001
+TX9                               00000006
+TX9D                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+T_FILTRO                          00000014
+VR0                               00000000
+VR1                               00000001
+VR2                               00000002
+VR3                               00000003
+VRCON                             0000009F
+VREN                              00000007
+VROE                              00000006
+VRR                               00000005
+W                                 00000000
+MPASM  4.02 Released                               DIMMER.ASM   11-15-2005  16:07:50         PAGE 11
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+W_TEMP                            00000020
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CP_50                            00002BFF
+_CP_75                            000017FF
+_CP_ALL                           000003FF
+_CP_OFF                           00003FFF
+_DATA_CP_OFF                      00003FFF
+_DATA_CP_ON                       00003EFF
+_ER_OSC_CLKOUT                    00003FFF
+_ER_OSC_NOCLKOUT                  00003FFE
+_EXTCLK_OSC                       00003FEF
+_HS_OSC                           00003FEE
+_INTRC_OSC_CLKOUT                 00003FFD
+_INTRC_OSC_NOCLKOUT               00003FFC
+_LP_OSC                           00003FEC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_MCLRE_OFF                        00003FDF
+_MCLRE_ON                         00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FED
+__16F628                          00000001
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X---XXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXX-----------
+2000 : -------X-------- ---------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   114
+Program Memory Words Free:  1934
+
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     3 reported,     0 suppressed
+
+

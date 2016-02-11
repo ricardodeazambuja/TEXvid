@@ -1,0 +1,1068 @@
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;****************************************************************************
+                      00002 ;*                                                              $$$$$$$$$$$$$$                          
+                                    *
+                      00003 ;*                                                              $       TEXvid   $                      
+                                                                    *
+                      00004 ;*                                                              $$$$$$$$$$$$$$                          
+                                                            *
+                      00005 ;*                                              Sistema de interface ....                               
+                                                    *
+                      00006 ;*                                                                                                      
+                                                                            *
+                      00007 ;*                                      Desenvolvido por Ricardo de Azambuja                            
+                                    *
+                      00008 ;*                                                                                                      
+                                                                            *
+                      00009 ;*              main.asm                                                                                
+                                                                    *
+                      00010 ;*              Versão 0.1                                                      Data Inicial: 13/10/2005
+                                            *
+                      00011 ;*--------------------------------------------------------------------------*
+                      00012 ;* DESCRIÇÃO DO ARQUIVO / PROJETO:                                                                      
+                                            *
+                      00013 ;* -                                                                                                    
+                                                                    *
+                      00014 ;* -                                                                                                    
+                                                                    *
+                      00015 ;* -                                                                                                    
+                                                                    *
+                      00016 ;* -                                                                                                    
+                                                                    *
+                      00017 ;* -                                                                                                    
+                                                                    *
+                      00018 ;*--------------------------------------------------------------------------*
+                      00019 ;* NOTAS:                                                                                               
+                                                                    *
+                      00020 ;* 1)PINOS UTILIZADOS:
+                      00021 ;* -RA6 E RA7 (OSC EXTERNO);RB1 E RB2 (USART ASSÍNCRONA)
+                      00022 ;* -RA2 (SAÍDA DO VÍDEO COMPOSTO)                                                                       
+                                    *
+                      00023 ;* -RA1 (LED INDICADOR DE ERRO NA SERIAL)
+                      00024 ;* -Criar arquivos para as MACROS genéricas e específicas a este programa   *
+                      00025 ;* depois é só usar um #INCLUDE <MINHASMACROS.MAC>                                                      
+                                                                                                                            
+                      00026 ;****************************************************************************
+                      00027 
+                      00028 ;****************************************************************************
+                      00029 ;*                                                      ARQUIVOS DE DEFINIÇÕES                          
+                                                    *
+                      00030 ;****************************************************************************
+                      00031 
+                      00032 #INCLUDE <P16F628A.inc>       ; processor specific variable definitions
+                      00001         LIST
+                      00002 ; P16F628A.INC  Standard Header File, Version 1.00    Microchip Technology, Inc.
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00258         LIST
+                      00033 
+                      00034 
+                      00035 
+2007   3F42           00036         __CONFIG   _CP_OFF & _DATA_CP_OFF & _LVP_OFF & _BODEN_ON & _MCLRE_OFF & _WDT_OFF & _PWRTE_ON & _
+                            HS_OSC
+                      00037 ; Ver livro Desbravando o PIC pág 62 para as configurações
+                      00038 
+                      00039 ;****************************************************************************
+                      00040 ;*                                                      PAGINAÇÃO DE MEMÓRIA                            
+                                                    *
+                      00041 ;****************************************************************************
+                      00042 ;DEFINIÇÃO DE COMANDOS DE USUÁRIO PARA ALTERAÇÃO DA PÁGINA DE MEMÓRIA
+                      00043 #DEFINE         BANK0   BCF STATUS,RP0 ;SETA BANK 0 DE MEMÓRIA
+                      00044 #DEFINE         BANK1   BSF     STATUS,RP0 ;SETA BANK 1 DE MEMÓRIA
+                      00045 
+                      00046 ;A diretriz #DEFINE substitui nomes por expressões inteiras
+                      00047 ;(a diretriz EQU substitui nomes por números)
+                      00048 
+                      00049 
+                      00050 
+                      00051 ;****************************************************************************
+                      00052 ;*                                                              VARIÁVEIS                               
+                                                                    *
+                      00053 ;****************************************************************************
+                      00054 ;DEFINIÇÃO DOS NOMES E ENDEREÇOS DE TODAS AS VARIÁVEIS UTILIZADAS PELO SISTEMA
+                      00055 ;NÃO ESQUECER QUE TODAS ESSAS VARIÁVEIS SERÃO DE 8BITS
+                      00056 
+                      00057         CBLOCK          0x20                            ;ENDEREÇO INICIAL DA MEMÓRIA DE USUÁRIO
+  00000020            00058                                 W_TEMP                          ;REGISTRADORES TEMPORÁRIOS PARA USO
+  00000021            00059                                 STATUS_TEMP                     ;JUNTO ÀS INTERRUPÇÕES
+                      00060                                 ;AQUI IRÃO AS NOVAS VARIÁVEIS
+  00000022            00061                                 CONTADORLED_OERR        ;Contador usado para manter o led aceso por algu
+                            m tempo
+                      00062 
+                      00063         ENDC                                            ;FIM DO BLOCO DE MEMÓRIA
+                      00064 
+                      00065 ;CBLOCK e ENDC: é uma maneira simplificada de definirmos vários EQUs com 
+                      00066 ;endereços sequenciais. Assim fica mais fácil a migração para outro processador ou
+                      00067 ;para outro bloco de endereços.
+                      00068 
+                      00069 
+                      00070 
+                      00071 ;****************************************************************************
+                      00072 ;*                                                      FLAGS INTERNOS                                  
+                                                            *
+                      00073 ;****************************************************************************
+                      00074 ;DEFINIÇÃO DE TODOS OS FLAGS UTILIZADOS PELO SISTEMA
+                      00075 
+                      00076 
+                      00077 
+                      00078 ;****************************************************************************
+                      00079 ;*                                                              CONSTANTES                              
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                                                                    *
+                      00080 ;****************************************************************************
+                      00081 ;DEFINIÇÃO DE TODAS AS CONSTANTES UTILIZADAS PELO SISTEMA
+                      00082 
+  00000000            00083 INIC_TMR0               EQU             .0                      ;Inicializa o TMR0
+                      00084 
+                      00085 
+                      00086 
+                      00087 ;****************************************************************************
+                      00088 ;*                                                              MACROS                                  
+                                                                    *
+                      00089 ;****************************************************************************
+                      00090 
+                      00091 ;Esta macro foi necessária para facilitar a manutenção do código fonte.
+                      00092 ;Sem uma macro, esse conjunto de instruções seria repetido para cada bit lido
+                      00093 ;tornando o arquivo fonte ilegível para o programador.
+                      00094 ;
+                      00095 ;
+                      00096 ;SAIDABIT
+                      00097 ;Gera o código necessário para a leitura de um bit da memória RAM
+                      00098 ;e posterior escrita no pino definido por saida.
+                      00099 ; - ENDERECO_INI: endereço inicial da RAM onde esta a linha que será lida.
+                      00100 ; - ENDERECO_FIN: endereço final.
+                      00101 ; - NBIT    : número de bits a serem lidos no total (assim não preciso ler bytes inteiros)
+                      00102 ; - ROTULO  : rótulo inicial para servir como endereço base na memória de programa.
+                      00103 SAIDABIT        MACRO   ENDERECO_INI, ENDERECO_FIN, NBIT, ROTULO
+                      00104                                 VARIABLE        i=0                                             ;define 
+                            uma variável para o compilador
+                      00105                                                                                                         
+                            ;NÃO ESTARÁ PRESENTE NO ASSEMBLY!
+                      00106                                 VARIABLE        ENDERECO=ENDERECO_INI
+                      00107                                 WHILE ENDERECO<=ENDERECO_FIN
+                      00108                                 WHILE i<NBIT
+                      00109                                         btfss           ENDERECO,i
+                      00110                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+                      00111                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+                      00112                                         goto            ROTULO+(7*(i+1))        ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                      00113                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+                      00114                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+                      00115                                         nop
+                      00116                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+                      00117                                 i+=1
+                      00118                                 ENDW ;fim do segundo while
+                      00119                                 i=0
+                      00120                                 ENDERECO+=1
+                      00121                                 ENDW ;fim do primeiro while
+                      00122                         ENDM
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00123 
+                      00124 
+                      00125 ;****************************************************************************
+                      00126 ;*                                                              ENTRADAS                                
+                                                                    *
+                      00127 ;****************************************************************************
+                      00128 ;DEFINIÇÃO DE TODOS OS PINOS QUE SERÃO UTILIZADOS COMO ENTRADA
+                      00129 ;COM OS SEUS ESTADOS COMENTADOS (0 E 1)
+                      00130 
+                      00131 
+                      00132 ;****************************************************************************
+                      00133 ;*                                                                      SAÍDAS                          
+                                                                    *
+                      00134 ;****************************************************************************
+                      00135 ;DEFINIÇÃO DE TODOS OS PINOS QUE SERÃO UTILIZADOS COMO SAÍDA
+                      00136 ;RECOMENDAMOS TAMBÉM COMENTAR O SIGNIFICADO DE SEUS ESTADOS (0 E 1)
+                      00137 
+                      00138 #DEFINE                 saida           PORTA,2         ;A princípio, esta será a saída de vídeo RA2
+                      00139                                                                                 ;- 1 para branco
+                      00140                                                                                 ;- 0 para preto
+                      00141                                                                                 ;- alta impedância para 
+                            sincronismo
+                      00142                                                                                 ;*para o sincronismo dev
+                            e-se mudar no TRISA
+                      00143 
+                      00144 #DEFINE                 LED_OERR        PORTA,1         ;Define o pino do led que indicará o erro no rec
+                            ebimento
+                      00145                                                                                 ;da serial.             
+                                                                                            
+                      00146                                                                                 ;- 1 apagado (normal)
+                      00147                                                                                 ;- 0 aceso (erro overrun
+                             no recebimento)
+                      00148 
+                      00149 
+                      00150 ;****************************************************************************
+                      00151 ;*                                                              VETOR DE RESET                          
+                                                            *
+                      00152 ;****************************************************************************
+0000                  00153         ORG             0x00                            ;ENDEREÇO INICIAL DE PROCESSAMENTO
+0000   2829           00154         GOTO            INICIO
+                      00155 
+                      00156 
+                      00157 
+                      00158 ;****************************************************************************
+                      00159 ;*                                              INÍCIO DAS INTERRUPÇÕES                                 
+                                                    *
+                      00160 ;****************************************************************************
+                      00161 ;ENDEREÇOS DE DESVIO DAS INTERRUPÇÕES, A PRIMEIRA TAREFA É SALVAR OS VALORES
+                      00162 ;DE "W" E "STATUS" PARA RECUPERAÇÃO FUTURA
+                      00163 
+0004                  00164         ORG             0x04                            ;ENDEREÇO INICIAL DAS INTERRUPÇÕES
+0004   00A0           00165         MOVWF           W_TEMP                          ;COPIA W PARA W_TEMP
+0005   0E03           00166         SWAPF           STATUS,W
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0006   00A1           00167         MOVWF           STATUS_TEMP                     ;COPIA STATUS PARA STATUS_TEMP
+                      00168         
+                      00169 
+                      00170 ;****************************************************************************
+                      00171 ;*                                                      ROTINA DE INTERRUPÇÃO                           
+                                                    *
+                      00172 ;****************************************************************************
+                      00173 ;AQUI SERÃO ESCRITAS AS ROTINAS DE RECONHECIMENTO E TRATAMENTO DAS INTERRUPÇÕES
+                      00174 ;No PIC16F628A, para sabermos qual foi a interrupção que ocorreu deve-se fazer
+                      00175 ;um tratamento por software (polling).
+                      00176 
+0007   190B           00177         btfsc           INTCON,T0IF                     ;Testa se interrupção foi do TMR0       
+0008   280C           00178         goto            INT_TIMER0
+                      00179 
+0009   1A8C           00180         btfsc           PIR1,RCIF                       ;Testa se interrupção foi por recebimento serial
+000A   2818           00181         goto            INT_SERIAL
+                      00182 
+000B   2823           00183         goto            SAI_INT
+                      00184 
+                      00185 
+                      00186 ;Tratamento da interrupção por estouro do Timer0
+000C                  00187 INT_TIMER0
+000C   110B           00188         bcf                     INTCON,T0IF                     ;Limpa o bit que foi setado pelo estouro
+                             do TMR0
+000D   3000           00189         movlw           INIC_TMR0
+000E   0081           00190         movwf           TMR0                            ;Recarrega o TMR0
+                      00191 
+000F   1B86           00192         btfsc           PORTB,7
+0010   2812           00193         goto            LIMPAR
+0011   2815           00194         goto            SETAR
+                      00195 
+0012                  00196 LIMPAR
+0012   1386           00197         bcf                     PORTB,7
+0013   1505           00198         bsf                     PORTA,2
+0014   2823           00199         goto            SAI_INT
+                      00200 
+0015                  00201 SETAR
+0015   1786           00202         bsf                     PORTB,7
+0016   1105           00203         bcf                     PORTA,2
+0017   2823           00204         goto            SAI_INT
+                      00205 
+                      00206 ;Tratamento da interrupção devido à recepção pela Serial
+0018                  00207 INT_SERIAL
+0018   128C           00208         bcf             PIR1,RCIF               ;Clear RCIF Interrupt Flag
+                      00209 
+0019   3000           00210         movlw           .0
+001A   081A           00211         movf            RCREG,W
+                      00212 
+001B   1898           00213         btfsc           RCSTA,OERR                      ;Testa se houve erro na recepção (overrun error)
+001C   281E           00214         goto            ERRO_OERR
+                      00215 ;Se não ocorreu o erro, devo garantir que o led estará apagado?
+                      00216 ;-Não, porque o led inicia apagado e depois o controle se encarrega disso.
+001D   2823           00217         goto            SAI_INT
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00218 
+                      00219 
+                      00220 ;Tratamento do Overrun Error e acendimento / apagamento do led indicativo
+001E                  00221 ERRO_OERR
+001E   1085           00222         bcf                     LED_OERR                        ;Acende o led
+                      00223 ;       incfsz          CONTADORLED_OERR        ;Incrementa o contador e se for zero apaga o bit OERR
+                      00224                                                                         ;e desliga o led indicador.
+                      00225 ;       goto            SAI_INT
+                      00226         
+001F   1218           00227         bcf                     RCSTA,CREN                      ;Desliga o bit OERR (ele é ligado por ha
+                            rdware)
+0020   1218           00228         bcf                     RCSTA,CREN                      ;Note que para desligar o OERR é necessá
+                            rio
+                      00229                                                                         ;desligar e ligar o CREN (que at
+                            iva o recebimento.
+                      00230 
+0021   1485           00231         bsf                     LED_OERR                        ;Desliga o led indicador de erro na seri
+                            al
+                      00232 
+0022   2823           00233         goto            SAI_INT
+                      00234 
+                      00235         
+                      00236 ;Aqui eu deveria ligar o led que indicará esse tipo de erro
+                      00237 ;O bit OERR deve ser limpo por software. Preciso implementar um contador
+                      00238 ;para garantir que o led ficará tempo suficiente aceso para que um ser humano
+                      00239 ;consiga percebê-lo
+                      00240 
+                      00241 
+                      00242 ;****************************************************************************
+                      00243 ;*                                                      ROTINA DE SAÍDA DA INTERRUPÇÃO                  
+                                            *
+                      00244 ;****************************************************************************
+                      00245 ;OS VALORES DE "W" E "STATUS" DEVEM SER RECUPERADOS ANTES DE RETORNAR DA INTERRUPÇÃO
+                      00246 
+0023                  00247 SAI_INT
+0023   0E21           00248         SWAPF           STATUS_TEMP,W
+0024   0083           00249         MOVWF           STATUS                          ;MOVE STATUS_TEMP PARA STATUS
+0025   0EA0           00250         SWAPF           W_TEMP,F
+0026   0E20           00251         SWAPF           W_TEMP,W                        ;MOVE W_TEMP PARA W
+0027   0009           00252         RETFIE                                                  ;RETORNA DA INTERRUPÇÃO (VER ESQUEMA LIV
+                            RO PÁG 135)
+                      00253 
+                      00254 ;OBSERVAÇÕES: 
+                      00255 ;- A utilização de SWAPF ao invés de MOVF evita a alteração do STATUS.
+                      00256 ;- No início do tratamento da interrupção, a chave geral é desligada automaticamente
+                      00257 ;e depois do RETFIE ela é religada.
+                      00258 
+                      00259 ;****************************************************************************
+                      00260 ;*                                                      ROTINAS E SUBROTINAS                            
+                                                    *
+                      00261 ;****************************************************************************
+                      00262 ;CADA ROTINA OU SUBROTINA DEVE POSSUIR A DESCRIÇÃO DE FUNCIONAMENTO E UM
+                      00263 ;NOME COERENTE ÀS SUAS FUNÇÕES
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00264 
+0028                  00265 SUBROTINA1
+                      00266         ;CORPO DA ROTINA
+                      00267 
+0028   0008           00268         RETURN
+                      00269 
+                      00270 
+                      00271 ;****************************************************************************
+                      00272 ;*                                                      INÍCIO DO PROGRAMA                              
+                                                            *
+                      00273 ;****************************************************************************
+                      00274 
+0029                  00275 INICIO
+                      00276 ;Limpa a memória RAM a partir do endereço 0x20
+                      00277 ;Trecho de código retirado do datasheet PICmicro MID-RANGE MCU FAMILY
+                      00278 
+0029   0183           00279         CLRF            STATUS                          ; Clear STATUS register (Bank0)
+002A   3020           00280         MOVLW           0x20                            ; 1st address (in bank) of GPR area
+002B   0084           00281         MOVWF           FSR                                     ; Move it to Indirect address register
+002C                  00282 Bank0_LP
+002C   0180           00283         CLRF            INDF                            ; Clear GPR at address pointed to by FSR
+002D   0A84           00284         INCF            FSR, 1                          ; Next GPR (RAM) address
+002E   1F84           00285         BTFSS           FSR, 7                          ; End of current bank ? (FSR = 80h, C = 0)
+002F   282C           00286         GOTO            Bank0_LP                        ; NO, clear next location
+                      00287 ;
+                      00288 ; Next Bank (Bank1)
+                      00289 ; (** ONLY REQUIRED IF DEVICE HAS A BANK1 **)
+                      00290 ;
+0030   30A0           00291         MOVLW           0xA0                            ; 1st address (in bank) of GPR area
+0031   0084           00292         MOVWF           FSR                             ; Move it to Indirect address register
+0032                  00293 Bank1_LP
+0032   0180           00294         CLRF            INDF                            ; Clear GPR at address pointed to by FSR
+0033   0A84           00295         INCF            FSR, 1                          ; Next GPR (RAM) address
+0034   0000           00296         NOP
+0035   1D03           00297         BTFSS           STATUS, Z                       ; End of current bank? (FSR = 00h, Z = 1)
+0036   2832           00298         GOTO            Bank1_LP                        ; NO, clear next location
+                      00299 
+                      00300 ;Fim da limpeza da memória
+0037   1283           00301         BANK0                                                   ;TROCA PARA O BANCO DE MEMÓRIA 0
+0038   0185           00302         CLRF            PORTA                           ;LIMPA O PORTA
+0039   0186           00303         CLRF            PORTB                           ;LIMPA O PORTB
+                      00304 
+                      00305 
+003A   1683           00306         BANK1                                                   ;TROCA PARA O BANCO DE MEMÓRIA 1
+003B   3000           00307         MOVLW           B'00000000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+003C   0085           00308         MOVWF           TRISA                           ;DEFINE ENTRADAS E SAÍDAS DO PORT A
+003D   3006           00309         MOVLW           B'00000110'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+003E   0086           00310         MOVWF           TRISB                           ;DEFINE ENTRADAS E SAÍDAS DO PORT B
+                      00311                                                                         ;Bits 1 e 2 referentes a USART
+003F   3000           00312         MOVLW           B'00000000'
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0040   0081           00313         MOVWF           OPTION_REG                      ;DEFINE OPÇÕES DE OPERAÇÃO
+0041   3000           00314         MOVLW           B'00000000'
+0042   008B           00315         MOVWF           INTCON                          ;DEFINE OPÇÕES DE INTERRUPÇÕES
+                      00316 
+                      00317 ;Meu setup
+                      00318 ;Aqui são configurados os registrados especiais (SFR) para o funcionamento correto do sistema
+                      00319 ;Para mais informações sobre os bits dos SFRs, ver livro pág 193
+0043   1283           00320         BANK0
+0044   3000           00321         movlw           INIC_TMR0
+0045   0081           00322         movwf           TMR0                            ;Inicializa o TMR0 com 0
+0046   1683           00323         BANK1
+                      00324 
+                      00325         ;Setup para recepção pela USART assíncrona.
+                      00326         ;A configuração será feita para 9600-8N1.
+                      00327         ;Baud-Rate 9600, 8 bits de dados, sem paridade e um stop-bit.
+0047   3081           00328         movlw           .129                            ;Carrega o valor para
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0048   0099           00329         movwf           SPBRG                           ;setar o BaudRate da USART para 9600.
+                      00330 
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0049   1218           00331         bcf                     TXSTA, SYNC                     ;Habilita a Porta Serial Assíncrona
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+004A   1518           00332         bsf                     TXSTA, BRGH                     ;Seta para High Speed Baud
+004B   1283           00333         BANK0                                                   ;limpando o SYNC e setando o SPEN.
+004C   1798           00334         bsf                     RCSTA, SPEN                     ;
+004D   1683           00335         BANK1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+004E   168C           00336         bsf                     PIE1, RCIE                      ;Habilita a interrupção de recepção
+004F   1283           00337         BANK0
+0050   1018           00338         bcf                     RCSTA, RX9D                     ;Desabilita a recepção de 9bits (usada p
+                            ara o CRC por software).
+0051   1618           00339         bsf                     RCSTA, CREN                     ;Habilita a recepção.
+                      00340         ;Fim do setup da serial
+                      00341 
+                      00342 
+0052   1683           00343         BANK1
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0053   1281           00344         bcf                     OPTION_REG,T0CS         ;Seta o TMR0 para o timer mode - incrementa a ca
+                            da ciclo de clock
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+0054   1581           00345         bsf                     OPTION_REG,PSA          ;Ativa o Prescaler para o WDT fazendo com que o 
+                            TIMER0 fique 1:1
+0055   168B           00346         bsf                     INTCON,T0IE                     ;Habilita a interrupção do TMR0
+0056   170B           00347         bsf                     INTCON, PEIE            ;Habilita as interrupções dos periféricos.
+0057   178B           00348         bsf                     INTCON,GIE                      ;Ativa as interrupções
+                      00349 
+0058   1283           00350         BANK0
+0059   1485           00351         bsf                     LED_OERR                        ;Inicia o programa com o led setado (apa
+                            gado) para OK
+                      00352 
+                      00353 
+                      00354 ;Fim do Meu setup
+                      00355 
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00356 ;****************************************************************************
+                      00357 ;*                                                      INICIALIZAÇÃO DAS VARIÁVEIS                     
+                                                    *
+                      00358 ;****************************************************************************
+                      00359 
+005A   3000           00360         movlw           .0
+005B   00A2           00361         movwf           CONTADORLED_OERR        ;Inicializa o contador do LED_OERR
+                      00362 
+                      00363 ;****************************************************************************
+                      00364 ;*                                                      CORPO DA ROTINA PRINCIPAL                       
+                                                    *
+                      00365 ;****************************************************************************
+                      00366 
+005C                  00367 MAIN
+                      00368         ;CORPO DA ROTINA PRINCIPAL
+                      00369 
+005C   30AA           00370         movlw           B'10101010'             ;Carrega a memória RAM com esse valor
+005D   00A2           00371         movwf           0x22                    ;para eu poder testar as rotinas de leitura/escrita de b
+                            it
+                      00372                                                                 ;no pino definido por saida.
+                      00373 
+005E   3002           00374         movlw           .2                              ;Carrega o W com o valor necessário
+                      00375                                                                 ;para a lógica do PCL.
+                      00376 
+005F                  00377 bit00
+                      00378         SAIDABIT 0x22,0x23,8,bit00
+  0000                    M                                 VARIABLE        i=0                                             ;define 
+                            uma variável para o compilador
+                          M                                                                                                         
+                            ;NÃO ESTARÁ PRESENTE NO ASSEMBLY!
+  0022                    M                                 VARIABLE        ENDERECO=0x22
+                          M                                 WHILE ENDERECO<=0x23
+                          M                                 WHILE i<8
+005F   1C22               M                                         btfss           ENDERECO,i
+0060   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+0061   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+0062   2866               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+0063   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+0064   0000               M                                         nop
+0065   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000001                M                                 i+=1
+0066   1CA2               M                                         btfss           ENDERECO,i
+0067   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+0068   1505               M                                         bsf                     saida                           ;Seta o 
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                            pino de saída pra 1
+0069   286D               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+006A   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+006B   0000               M                                         nop
+006C   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000002                M                                 i+=1
+006D   1D22               M                                         btfss           ENDERECO,i
+006E   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+006F   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+0070   2874               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+0071   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+0072   0000               M                                         nop
+0073   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000003                M                                 i+=1
+0074   1DA2               M                                         btfss           ENDERECO,i
+0075   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+0076   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+0077   287B               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+0078   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+0079   0000               M                                         nop
+007A   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000004                M                                 i+=1
+007B   1E22               M                                         btfss           ENDERECO,i
+007C   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+007D   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+007E   2882               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+007F   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+0080   0000               M                                         nop
+0081   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000005                M                                 i+=1
+0082   1EA2               M                                         btfss           ENDERECO,i
+0083   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+0084   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+0085   2889               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+0086   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+0087   0000               M                                         nop
+0088   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000006                M                                 i+=1
+0089   1F22               M                                         btfss           ENDERECO,i
+008A   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+008B   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+008C   2890               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+008D   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+008E   0000               M                                         nop
+008F   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000007                M                                 i+=1
+0090   1FA2               M                                         btfss           ENDERECO,i
+0091   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+0092   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+0093   2897               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+0094   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+0095   0000               M                                         nop
+0096   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+Warning[207]: Found label after column 1. (i)
+  00000008                M                                 i+=1
+                          M                                 ENDW ;fim do segundo while
+Warning[207]: Found label after column 1. (i)
+  00000000                M                                 i=0
+Warning[207]: Found label after column 1. (ENDERECO)
+  00000023                M                                 ENDERECO+=1
+                          M                                 WHILE i<8
+0097   1C23               M                                         btfss           ENDERECO,i
+0098   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+0099   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+009A   2866               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+009B   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+009C   0000               M                                         nop
+009D   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000001                M                                 i+=1
+009E   1CA3               M                                         btfss           ENDERECO,i
+009F   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+00A0   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00A1   286D               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00A2   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00A3   0000               M                                         nop
+00A4   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000002                M                                 i+=1
+00A5   1D23               M                                         btfss           ENDERECO,i
+00A6   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+00A7   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00A8   2874               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00A9   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00AA   0000               M                                         nop
+00AB   0000               M                                         nop                                                             
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000003                M                                 i+=1
+00AC   1DA3               M                                         btfss           ENDERECO,i
+00AD   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+00AE   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00AF   287B               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00B0   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00B1   0000               M                                         nop
+00B2   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000004                M                                 i+=1
+00B3   1E23               M                                         btfss           ENDERECO,i
+00B4   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+00B5   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00B6   2882               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00B7   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00B8   0000               M                                         nop
+00B9   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000005                M                                 i+=1
+00BA   1EA3               M                                         btfss           ENDERECO,i
+00BB   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+00BC   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00BD   2889               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00BE   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00BF   0000               M                                         nop
+00C0   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000006                M                                 i+=1
+00C1   1F23               M                                         btfss           ENDERECO,i
+00C2   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                            ito do goto, mas com uma única instrução        
+00C3   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00C4   2890               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00C5   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00C6   0000               M                                         nop
+00C7   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000007                M                                 i+=1
+00C8   1FA3               M                                         btfss           ENDERECO,i
+00C9   0782               M                                         addwf           PCL,1                           ;Tem o mesmo efe
+                            ito do goto, mas com uma única instrução        
+00CA   1505               M                                         bsf                     saida                           ;Seta o 
+                            pino de saída pra 1
+00CB   2897               M                                         goto            bit00+(7*(i+1))         ;"Mágica" usada para pul
+                            ar para as linhas corretas 
+                          M                                                                                                         
+                            ;usando o endereço inicial passado para a macro na forma de rótulo
+00CC   1105               M                                         bcf                     saida                           ;Seta o 
+                            pino de saída pra 0
+00CD   0000               M                                         nop
+00CE   0000               M                                         nop                                                             
+                            ;Se vc não sabe o que isso significa...
+Warning[207]: Found label after column 1. (i)
+  00000008                M                                 i+=1
+                          M                                 ENDW ;fim do segundo while
+Warning[207]: Found label after column 1. (i)
+  00000000                M                                 i=0
+Warning[207]: Found label after column 1. (ENDERECO)
+  00000024                M                                 ENDERECO+=1
+                          M                                 ENDW ;fim do primeiro while
+00CF                  00379 bit0
+00CF   1C22           00380         btfss           0x22,0
+00D0   0782           00381         addwf           PCL,1
+00D1   1505           00382         bsf                     saida
+00D2   28D6           00383         goto            proximo_bit
+00D3   1105           00384         bcf                     saida
+00D4   0000           00385         nop
+00D5   0000           00386         nop
+                      00387 
+00D6                  00388 proximo_bit
+00D6   1CA2           00389         btfss           0x22,1
+00D7   0782           00390         addwf           PCL,1
+00D8   1505           00391         bsf                     saida
+00D9   28D6           00392         goto            proximo_bit
+00DA   1105           00393         bcf                     saida
+00DB   0000           00394         nop
+00DC   0000           00395         nop
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00396 
+00DD   285C           00397         GOTO            MAIN
+                      00398 
+                      00399 ;****************************************************************************
+                      00400 ;*                                                      FIM DO PROGRAMA                                 
+                                                            *
+                      00401 ;****************************************************************************
+                      00402 
+                      00403 
+                      00404         END                                                     ;INDICA O FIM DO ARQUIVO CÓDIGO-FONTE
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 16
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ADEN                              00000003
+BANK0                             BCF STATUS,RP0
+BANK1                             BSF     STATUS,RP0
+BRGH                              00000002
+Bank0_LP                          0000002C
+Bank1_LP                          00000032
+C                                 00000000
+C1INV                             00000004
+C1OUT                             00000006
+C2INV                             00000005
+C2OUT                             00000007
+CCP1CON                           00000017
+CCP1IE                            00000002
+CCP1IF                            00000002
+CCP1M0                            00000000
+CCP1M1                            00000001
+CCP1M2                            00000002
+CCP1M3                            00000003
+CCP1X                             00000005
+CCP1Y                             00000004
+CCPR1H                            00000016
+CCPR1L                            00000015
+CIS                               00000003
+CM0                               00000000
+CM1                               00000001
+CM2                               00000002
+CMCON                             0000001F
+CMIE                              00000006
+CMIF                              00000006
+CONTADORLED_OERR                  00000022
+CREN                              00000004
+CSRC                              00000007
+DC                                00000001
+EEADR                             0000009B
+EECON1                            0000009C
+EECON2                            0000009D
+EEDATA                            0000009A
+EEIE                              00000007
+EEIF                              00000007
+ENDERECO                          00000024
+ERRO_OERR                         0000001E
+F                                 00000001
+FERR                              00000002
+FSR                               00000004
+GIE                               00000007
+INDF                              00000000
+INICIO                            00000029
+INIC_TMR0                         00000000
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+INT_SERIAL                        00000018
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 17
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+INT_TIMER0                        0000000C
+IRP                               00000007
+LED_OERR                          PORTA,1
+LIMPAR                            00000012
+MAIN                              0000005C
+NOT_BO                            00000000
+NOT_BOD                           00000000
+NOT_BOR                           00000000
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RBPU                          00000007
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+OERR                              00000001
+OPTION_REG                        00000081
+OSCF                              00000003
+PCL                               00000002
+PCLATH                            0000000A
+PCON                              0000008E
+PEIE                              00000006
+PIE1                              0000008C
+PIR1                              0000000C
+PORTA                             00000005
+PORTB                             00000006
+PR2                               00000092
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+RBIE                              00000003
+RBIF                              00000000
+RCIE                              00000005
+RCIF                              00000005
+RCREG                             0000001A
+RCSTA                             00000018
+RD                                00000000
+RP0                               00000005
+RP1                               00000006
+RX9                               00000006
+RX9D                              00000000
+SAIDABIT                          
+SAI_INT                           00000023
+SETAR                             00000015
+SPBRG                             00000099
+SPEN                              00000007
+SREN                              00000005
+STATUS                            00000003
+STATUS_TEMP                       00000021
+SUBROTINA1                        00000028
+SYNC                              00000004
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 18
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000010
+T1OSCEN                           00000003
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             00000012
+TMR0                              00000001
+TMR1CS                            00000001
+TMR1H                             0000000F
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             0000000E
+TMR1ON                            00000000
+TMR2                              00000011
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOUTPS0                           00000003
+TOUTPS1                           00000004
+TOUTPS2                           00000005
+TOUTPS3                           00000006
+TRISA                             00000085
+TRISB                             00000086
+TRMT                              00000001
+TX9                               00000006
+TX9D                              00000000
+TXEN                              00000005
+TXIE                              00000004
+TXIF                              00000004
+TXREG                             00000019
+TXSTA                             00000098
+VR0                               00000000
+VR1                               00000001
+VR2                               00000002
+VR3                               00000003
+VRCON                             0000009F
+VREN                              00000007
+VROE                              00000006
+VRR                               00000005
+W                                 00000000
+WR                                00000001
+WREN                              00000002
+WRERR                             00000003
+W_TEMP                            00000020
+Z                                 00000002
+_BODEN_OFF                        00003FBF
+_BODEN_ON                         00003FFF
+_CP_OFF                           00003FFF
+_CP_ON                            00001FFF
+_DATA_CP_OFF                      00003FFF
+_DATA_CP_ON                       00003EFF
+MPASM 03.20.02 Released          MAIN.ASM   11-14-2005  23:12:05         PAGE 19
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_EXTCLK_OSC                       00003FEF
+_HS_OSC                           00003FEE
+_INTOSC_OSC_CLKOUT                00003FFD
+_INTOSC_OSC_NOCLKOUT              00003FFC
+_LP_OSC                           00003FEC
+_LVP_OFF                          00003F7F
+_LVP_ON                           00003FFF
+_MCLRE_OFF                        00003FDF
+_MCLRE_ON                         00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FF7
+_RC_OSC_CLKOUT                    00003FFF
+_RC_OSC_NOCLKOUT                  00003FFE
+_WDT_OFF                          00003FFB
+_WDT_ON                           00003FFF
+_XT_OSC                           00003FED
+__16F628A                         00000001
+bit0                              000000CF
+bit00                             0000005F
+i                                 00000000
+proximo_bit                       000000D6
+saida                             PORTA,2
+
+
+MEMORY USAGE MAP ('X' = Used,  '-' = Unused)
+
+0000 : X---XXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0040 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+0080 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXX
+00C0 : XXXXXXXXXXXXXXXX XXXXXXXXXXXXXX-- ---------------- ----------------
+2000 : -------X-------- ---------------- ---------------- ----------------
+
+All other memory blocks unused.
+
+Program Memory Words Used:   219
+Program Memory Words Free:  1829
+
+
+Errors   :     0
+Warnings :    20 reported,     0 suppressed
+Messages :     9 reported,     0 suppressed
+
+
