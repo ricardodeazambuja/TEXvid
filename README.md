@@ -11,3 +11,6 @@ Example: @1HELLO, WORLD!
 ![TEXvid - live!](/imgs/texvid_working.jpeg)
 ## Example of how the characters were created
 ![PCB - parts](/imgs/texvid_example.png)
+
+
+http://ricardodeazambuja.com/
